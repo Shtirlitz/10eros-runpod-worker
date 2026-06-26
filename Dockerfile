@@ -136,7 +136,7 @@ import os, shutil; \
 from huggingface_hub import hf_hub_download; \
 token = os.environ.get('HF_TOKEN') or None; \
 variant = os.environ.get('MODEL_VARIANT', 'fp8'); \
-ckpt = '10Eros_v1_fp8_transformer.safetensors' if variant == 'fp8' else '10Eros_v1_bf16.safetensors'; \
+ckpt = '10Eros_v1-fp8mixed_learned.safetensors' if variant == 'fp8' else '10Eros_v1-fp8mixed_learned.safetensors'; \
 \
 hf_hub_download(repo_id='TenStrip/LTX2.3-10Eros', filename=ckpt, local_dir='/comfyui/models/checkpoints', token=token); \
 \
