@@ -109,7 +109,8 @@ ENV PIP_NO_INPUT=1
 CMD ["/start.sh"]
 
 # Stage 2: Final image — download 10Eros + LTX 2.3 ancillary models.
-# MODEL_VARIANT picks fp8 (29.6 GB, default) or bf16 (46.1 GB).
+# MODEL_VARIANT picks fp8 (10Eros v1.5 learned fp8 by LokkenJP, 30.2 GB, default) or bf16
+# (TenStrip v1.5 original, 46.1 GB). v1.5 is tuned for the DMD distill LoRA (TenStrip/LTX2.3_DMD_Lora).
 FROM base AS final
 
 ARG HUGGINGFACE_ACCESS_TOKEN
@@ -136,15 +137,22 @@ import os, shutil; \
 from huggingface_hub import hf_hub_download; \
 token = os.environ.get('HF_TOKEN') or None; \
 variant = os.environ.get('MODEL_VARIANT', 'fp8'); \
-ckpt = '10Eros_v1-fp8mixed_learned.safetensors' if variant == 'fp8' else '10Eros_v1-fp8mixed_learned.safetensors'; \
+import hashlib; \
+repo, ckpt, sha = (('LokkenJP/10EROS_1.5_fp8_exp_learned', '10Eros_v1.5_fp8mixed_experimental_learned.safetensors', '192c8f544fe1694bd974e30217ca0f006be9d629b502313921989ee101bfe483') if variant == 'fp8' else ('TenStrip/LTX2.3-10Eros', '10Eros_v1.5_bf16.safetensors', '')); \
+path = hf_hub_download(repo_id=repo, filename=ckpt, local_dir='/comfyui/models/checkpoints', token=token); \
+h = hashlib.sha256(); f = open(path, 'rb'); [h.update(b) for b in iter(lambda: f.read(1 << 24), b'')]; f.close(); \
+assert not sha or h.hexdigest() == sha, 'checkpoint sha256 mismatch: ' + h.hexdigest(); \
+print('checkpoint', ckpt, h.hexdigest()); \
 \
-hf_hub_download(repo_id='TenStrip/LTX2.3-10Eros', filename=ckpt, local_dir='/comfyui/models/checkpoints', token=token); \
+hf_hub_download(repo_id='TenStrip/LTX2.3_DMD_Lora', filename='LTX2.3_DMD_hybrid_v2.safetensors', local_dir='/comfyui/models/loras', token=token); \
+hf_hub_download(repo_id='TenStrip/LTX2.3_DMD_Lora', filename='LTX2.3_DMD_reshaped_r256.safetensors', local_dir='/comfyui/models/loras', token=token); \
 \
 hf_hub_download(repo_id='SulphurAI/Sulphur-2-base', filename='distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors', local_dir='/tmp/sl', token=token); \
 shutil.move('/tmp/sl/distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors', '/comfyui/models/loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors'); \
 shutil.rmtree('/tmp/sl', ignore_errors=True); \
 \
 hf_hub_download(repo_id='Lightricks/LTX-2.3', filename='ltx-2.3-spatial-upscaler-x2-1.0.safetensors', local_dir='/comfyui/models/latent_upscale_models', token=token); \
+hf_hub_download(repo_id='Lightricks/LTX-2.3', filename='ltx-2.3-spatial-upscaler-x2-1.1.safetensors', local_dir='/comfyui/models/latent_upscale_models', token=token); \
 \
 hf_hub_download(repo_id='Comfy-Org/ltx-2', filename='split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors', local_dir='/tmp/te', token=token); \
 shutil.move('/tmp/te/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors', '/comfyui/models/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors'); \
