@@ -151,7 +151,6 @@ hf_hub_download(repo_id='SulphurAI/Sulphur-2-base', filename='distill_loras/ltx-
 shutil.move('/tmp/sl/distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors', '/comfyui/models/loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors'); \
 shutil.rmtree('/tmp/sl', ignore_errors=True); \
 \
-hf_hub_download(repo_id='Lightricks/LTX-2.3', filename='ltx-2.3-spatial-upscaler-x2-1.0.safetensors', local_dir='/comfyui/models/latent_upscale_models', token=token); \
 hf_hub_download(repo_id='Lightricks/LTX-2.3', filename='ltx-2.3-spatial-upscaler-x2-1.1.safetensors', local_dir='/comfyui/models/latent_upscale_models', token=token); \
 \
 hf_hub_download(repo_id='Comfy-Org/ltx-2', filename='split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors', local_dir='/tmp/te', token=token); \
