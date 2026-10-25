@@ -131,33 +131,42 @@ RUN mkdir -p \
 
 # All model repos below are public for the typical case. Lightricks/LTX-2.3 may
 # gate occasionally; pass HUGGINGFACE_ACCESS_TOKEN at build time if needed.
-RUN uv pip install "huggingface_hub[hf_xet]" && \
-    HF_TOKEN="${HUGGINGFACE_ACCESS_TOKEN}" MODEL_VARIANT="${MODEL_VARIANT}" python -c "\
-import os, shutil; \
+# One RUN per download: RunPod GitHub builds time out at ~30 min and cache layers, so a
+# retried build resumes from the last finished download instead of starting over.
+RUN uv pip install "huggingface_hub[hf_xet]"
+
+# 10Eros v1.5 checkpoint (bundles CLIP + VAEs), sha256-checked against the converter's sidecar.
+RUN HF_TOKEN="${HUGGINGFACE_ACCESS_TOKEN}" MODEL_VARIANT="${MODEL_VARIANT}" python -c "\
+import os, hashlib; \
 from huggingface_hub import hf_hub_download; \
 token = os.environ.get('HF_TOKEN') or None; \
 variant = os.environ.get('MODEL_VARIANT', 'fp8'); \
-import hashlib; \
 repo, ckpt, sha = (('LokkenJP/10EROS_1.5_fp8_exp_learned', '10Eros_v1.5_fp8mixed_experimental_learned.safetensors', '192c8f544fe1694bd974e30217ca0f006be9d629b502313921989ee101bfe483') if variant == 'fp8' else ('TenStrip/LTX2.3-10Eros', '10Eros_v1.5_bf16.safetensors', '')); \
 path = hf_hub_download(repo_id=repo, filename=ckpt, local_dir='/comfyui/models/checkpoints', token=token); \
 h = hashlib.sha256(); f = open(path, 'rb'); [h.update(b) for b in iter(lambda: f.read(1 << 24), b'')]; f.close(); \
 assert not sha or h.hexdigest() == sha, 'checkpoint sha256 mismatch: ' + h.hexdigest(); \
 print('checkpoint', ckpt, h.hexdigest()); \
-\
+" && rm -rf /root/.cache/huggingface /comfyui/models/checkpoints/.cache
+
+# Text encoder (Gemma 3 12B fp4).
+RUN HF_TOKEN="${HUGGINGFACE_ACCESS_TOKEN}" python -c "\
+import os, shutil; \
+from huggingface_hub import hf_hub_download; \
+hf_hub_download(repo_id='Comfy-Org/ltx-2', filename='split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors', local_dir='/tmp/te', token=os.environ.get('HF_TOKEN') or None); \
+shutil.move('/tmp/te/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors', '/comfyui/models/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors'); \
+" && rm -rf /root/.cache/huggingface /tmp/*
+
+# DMD distill LoRA (v1.5 is tuned for it), the older cond-safe distilled LoRA, spatial upscaler x2 1.1
+# (x2 1.0 was removed from Lightricks/LTX-2.3).
+RUN HF_TOKEN="${HUGGINGFACE_ACCESS_TOKEN}" python -c "\
+import os, shutil; \
+from huggingface_hub import hf_hub_download; \
+token = os.environ.get('HF_TOKEN') or None; \
 hf_hub_download(repo_id='TenStrip/LTX2.3_DMD_Lora', filename='LTX2.3_DMD_hybrid_v2.safetensors', local_dir='/comfyui/models/loras', token=token); \
-hf_hub_download(repo_id='TenStrip/LTX2.3_DMD_Lora', filename='LTX2.3_DMD_reshaped_r256.safetensors', local_dir='/comfyui/models/loras', token=token); \
-\
 hf_hub_download(repo_id='SulphurAI/Sulphur-2-base', filename='distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors', local_dir='/tmp/sl', token=token); \
 shutil.move('/tmp/sl/distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors', '/comfyui/models/loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors'); \
-shutil.rmtree('/tmp/sl', ignore_errors=True); \
-\
 hf_hub_download(repo_id='Lightricks/LTX-2.3', filename='ltx-2.3-spatial-upscaler-x2-1.1.safetensors', local_dir='/comfyui/models/latent_upscale_models', token=token); \
-\
-hf_hub_download(repo_id='Comfy-Org/ltx-2', filename='split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors', local_dir='/tmp/te', token=token); \
-shutil.move('/tmp/te/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors', '/comfyui/models/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors'); \
-shutil.rmtree('/tmp/te', ignore_errors=True); \
-" && \
-    rm -rf /root/.cache/huggingface /tmp/* && \
+" && rm -rf /root/.cache/huggingface /tmp/* /comfyui/models/loras/.cache /comfyui/models/latent_upscale_models/.cache && \
     uv cache clean
 
 # Surface the baked variant to the running container so logs/diagnostics can report it.
