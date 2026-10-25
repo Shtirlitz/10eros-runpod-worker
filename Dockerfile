@@ -169,5 +169,13 @@ hf_hub_download(repo_id='Lightricks/LTX-2.3', filename='ltx-2.3-spatial-upscaler
 " && rm -rf /root/.cache/huggingface /tmp/* /comfyui/models/loras/.cache /comfyui/models/latent_upscale_models/.cache && \
     uv cache clean
 
+# C compiler for triton: current ComfyUI JIT-compiles kernels on text encode (fp4 Gemma) and fails with
+# 'Failed to find C compiler' on the bare CUDA runtime base. Kept as the LAST layer so the model
+# download layers above stay cached.
+RUN apt-get update -o Acquire::Retries=3 && \
+    apt-get install -y --no-install-recommends -o Acquire::Retries=3 gcc libc6-dev && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+ENV CC=/usr/bin/gcc
+
 # Surface the baked variant to the running container so logs/diagnostics can report it.
 ENV MODEL_VARIANT=${MODEL_VARIANT}
